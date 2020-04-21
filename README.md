@@ -10,7 +10,7 @@ This is an article about how I made my own UIView service **on iOS 13.4.1**. By 
 
 **Remote Views:** Remote views (`_UIRemoteView`) are the view objects inside of remote view controllers. We don't really need to think about these.
 
-**iOS Tweak:** An iOS tweak is a shared library that is loaded into other processes by a process. These libraries are used to customize the behavior of a lot of things by using Objective-C runtime functions to modify the implementations of methods. This is a term that is unrelated to remote view controllers.
+**iOS Tweak:** This is a term used by people who jailbreak iOS devices. An iOS tweak is a shared library that is loaded into other processes by a process such as Cydia Substrate's `substrated`. These libraries are used to customize the behavior of a lot of things by using Objective-C runtime functions to modify the implementations of methods. This is a term that is unrelated to remote view controllers.
 
 ## Introduction
 
