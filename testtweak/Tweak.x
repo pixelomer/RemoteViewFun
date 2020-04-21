@@ -32,7 +32,7 @@ static UIViewController *_vc;
 %ctor {
   // Using dispatch_after() for this is a hack. Use something better for production
   // code, like hooking -[SpringBoard applicationDidFinishLaunching:].
-  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC*10), dispatch_get_main_queue(), ^{
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC*20), dispatch_get_main_queue(), ^{
     [%c(SERVRemoteRootViewController)
       requestViewControllerWithConnectionHandler:^(_UIRemoteViewController *vc, NSError *err){
         void(^blockForMain)(void) = ^{
