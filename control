@@ -1,0 +1,10 @@
+Package: com.pixelomer.writeup
+Name: UIView Service Writeup
+Depends: mobilesubstrate
+Version: 0.0.1
+Architecture: iphoneos-arm
+Description: UIView Service Writeup
+Homepage: https://github.com/pixelomer/RemoteViewFun
+Maintainer: PixelOmer
+Author: PixelOmer
+Section: Tweak

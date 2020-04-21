@@ -1,0 +1,4 @@
+#!/bin/bash
+
+killall testservice || true
+su mobile -c uicache || true
