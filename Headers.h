@@ -4,6 +4,7 @@
 + (NSInvocation *)requestViewController:(NSString *)className
 	fromServiceWithBundleIdentifier:(NSString *)bundleIdentifier
 	connectionHandler:(void(^)(_UIRemoteViewController *, NSError *))callback;
+- (NSProxy *)serviceViewControllerProxy;
 @end
 
 @interface NSXPCInterface : NSObject
@@ -17,4 +18,5 @@
 // Service
 @protocol SERVRootViewControllerRemoteService
 - (instancetype)init;
+- (void)setText:(NSString *)text;
 @end
