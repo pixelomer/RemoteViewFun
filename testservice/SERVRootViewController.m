@@ -4,6 +4,8 @@
 
 static NSArray<NSArray<UIColor *> *> *_colors;
 
++ (BOOL)_shouldUseXPCObjects { return NO; }
+
 + (void)load {
 	if (self == [SERVRootViewController class]) {
 		_colors = @[
@@ -16,13 +18,14 @@ static NSArray<NSArray<UIColor *> *> *_colors;
 
 - (instancetype)init {
 	NSLog(@"[TestService] -init called.");
+	_text = @"\"setText:\" unsupported on iOS 6";
 	return [super init];
 }
 
 - (void)handleTap:(UITapGestureRecognizer *)sender {
 	_colorIndex++;
 	if (_colorIndex >= _colors.count) _colorIndex = 0;
-	self.view.backgroundColor = _colors[_colorIndex][0];
+	_testLabel.backgroundColor = self.view.backgroundColor = _colors[_colorIndex][0];
 	_testLabel.textColor = _colors[_colorIndex][1];
 }
 

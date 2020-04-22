@@ -7,6 +7,8 @@
 
 %subclass SERVRemoteRootViewController : _UIRemoteViewController
 
++ (BOOL)_shouldUseXPCObjects { return NO; }
+
 %new
 + (NSInvocation *)requestViewControllerWithConnectionHandler:(void(^)(SERVRemoteRootViewController *, NSError *))block {
 	return [self
@@ -40,8 +42,10 @@ static UIViewController *_vc;
 					window = [[UIWindow alloc] initWithFrame:UIScreen.mainScreen.bounds];
 					window.windowLevel = CGFLOAT_MAX/2.0;
 					if (vc) {
-						// This line calls the setText: method on the server using a proxy.
-						[vc.serviceViewControllerProxy performSelector:@selector(setText:) withObject:@"Hello, world!"];
+						// This line calls the setText: method on the server using a proxy. This only works on iOS 7.0 and higher. This limitation needs to be researched further.
+						if (@available(iOS 7.0, *)) {
+							[vc.serviceViewControllerProxy performSelector:@selector(setText:) withObject:@"Hello, world!"];
+						}
 						
 						// Configure the window and show it
 						window.rootViewController = vc;

@@ -226,9 +226,9 @@ When I saw this, I decided to add the following into the implementation of SERVR
 
 Recompiled and installed it and surprisingly it works! I can now see the view controller from the service process inside of SpringBoard!
 
-## Other things
+## One more thing - Calling methods on the remote view controller
 
-You can add a method that exists on the service method to the server protocol. After doing so, you can call that method like this:  
+While looking at the headers, I found one more thing. You can add a method that exists on the service method to the server protocol. After doing so, you can call that method like this:  
 ```objc
 @protocol SERVRootViewControllerRemoteService
 -(instancetype)init;
@@ -241,3 +241,5 @@ You can add a method that exists on the service method to the server protocol. A
 ```
 
 The return value of the methods you call using this proxy must return either `void` or `NSProgress *`. Any other type will cause an exception to be raised.
+
+**Warning:** This only works on iOS 7.0 and higher. More research needs to be done for iOS 6, as it seems to rely on other things for communication between processes.
