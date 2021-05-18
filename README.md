@@ -6,15 +6,15 @@ This is an article about how I made my own UIView service **on iOS 13.4.1**. By 
 
 **UIView Service:** A process on iOS that serves remote view controllers.
 
-**Remote View Controllers:** A remote view controller (`_UIRemoteViewController`) represents a view controller that is displayed on your process while actually being located in a UIView service. This is a private API that was introduced with iOS 6 and its main purpose is to prevent user applications from having access to private data. For example, when you create an `MFMailComposeViewController`, you are actually creating a remote view controller. The view is still displayed in your own application, but the view controller object is not available in your application. This means that you cannot directly extract private information from that view controller, such as user's email address.
+**Remote View Controllers:** A remote view controller (`_UIRemoteViewController`) represents a view controller that is displayed on your process while actually being located in a UIView service. This is a private API that was introduced with iOS 6 and its main purpose is to prevent user applications from having access to private data. For example, when you create an `MFMailComposeViewController`, you are actually creating a remote view controller. The view is still displayed in your own application, but the view controller object is not available in your application. This means that you cannot directly extract private information from that view controller, such as the user's email address.
 
 **Remote Views:** Remote views (`_UIRemoteView`) are the view objects inside of remote view controllers. We don't really need to think about these.
 
-**iOS Tweak:** This is a term used by people who jailbreak iOS devices. An iOS tweak is a shared library that is loaded into other processes by a process such as Cydia Substrate's `substrated`. These libraries are used to customize the behavior of a lot of things by using Objective-C runtime functions to modify the implementations of methods. This is a term that is unrelated to remote view controllers.
+**iOS Tweak:** This is a term used by people who jailbreak iOS devices. An iOS tweak is a shared library that is loaded into other processes by a process such as Cydia Substrate's `substrated`. These libraries are used to customize the behavior of a lot of things by using Objective-C runtime functions to modify the implementations of methods. This is a term that is not related to remote view controllers.
 
 ## Introduction
 
-Recently, I decided to use remote view controllers in my iOS tweak. I knew about these view controllers thanks to [an article by Ole Begemann](https://oleb.net/blog/2012/10/remote-view-controllers-in-ios-6/). You should read it too if you haven't read it.
+Recently, I wanted to use remote view controllers in my iOS tweak. I knew about these view controllers thanks to [an article by Ole Begemann](https://oleb.net/blog/2012/10/remote-view-controllers-in-ios-6/). You should read it too if you haven't read it.
 
 At first, I assumed making my own UIView service would've been an easy task. These view controllers have existed since iOS 6, so there has to be some examples and articles online, right? Nope. That article I linked is apparently the only public article about remote view controllers. So, I decided to research them further.
 
@@ -75,7 +75,7 @@ Unfortunately, this did not work. I got the following error instead of a remote 
 _UIViewServiceInterfaceErrorDomain (error code 0)
 Un-trusted clients may not open applications in the background.
 ```
-This probably meant that I was missing an entitlement or Info.plist value that made my client "trusted". However, instead of finding that magic value, I decided to use the SpringBoard as a client rather than my own app. I created a SpringBoard tweak which runs the same code.
+This probably meant that I was missing an entitlement or Info.plist value that made my client "trusted". However, instead of finding that magic value, I ended up using the SpringBoard as a client rather than my own app. To do this, I created a SpringBoard tweak which had the same code.
 
 After installing the tweak and reloading SpringBoard, the service application was actually launched! However, I still couldn't get a remote view controller.
 ```
@@ -101,7 +101,7 @@ When I first saw the error seen above, I was stuck for a while. After desperatel
 +(id)requestViewControllerWithService:(id)arg1 traitCollection:(id)arg2 connectionHandler:(/*^block*/id)arg3 ;
 ```
 
-From the methods above, only two methods looked interesting: `+exportedInterface` and `+serviceViewControllerInterface`. I decided to call these methods using [FLEX](https://github.com/Flipboard/FLEX). `_UIRemoteViewController` returned null for these methods but when I tried calling them in `MFMailComposeRemoteViewController` (a subclass of `_UIRemoteViewController`) they returned two separate instances of `NSXPCInterface` with two different protocols. Investigating those protocols reveals that the protocol in `+exportedInterface` contains some methods of the client and the protocol in `+serviceViewControllerInterface` contains some methods of the server. These objects seemed like "header" objects.
+From the methods above, only two methods looked interesting: `+exportedInterface` and `+serviceViewControllerInterface`. I tried calling these methods using [FLEX](https://github.com/Flipboard/FLEX). `_UIRemoteViewController` returned null for these methods but when I tried calling them in `MFMailComposeRemoteViewController` (a subclass of `_UIRemoteViewController`), they returned two separate instances of `NSXPCInterface` with two different protocols. Investigating these protocols revealed that the protocol returned by `+exportedInterface` contained some methods of the client while the protocol returned by `+serviceViewControllerInterface` contained some methods of the server. These objects seemed like "header" objects.
 
 With this new information, I subclassed `_UIRemoteViewController` to override these methods.
 ```objc
@@ -145,11 +145,11 @@ With this new information, I subclassed `_UIRemoteViewController` to override th
 %end
 ```
 
-This still didn't work. However, this time I got a different error about an interrupted connection. Progress?
+This still didn't work. However, this time I got a different error about an interrupted connection. Progress!
 
 ## Checking out MailCompositionService
 
-MailCompositionService is an application that hosts the content for `MFMailComposeViewController`. I copied that app from my phone to my computer for disassembly. It's a small binary, and decompilation took a few seconds. Apparently, a class-dump would've been enough though. While looking at the methods, I immediately noticed `+_exportedInterface` and `+_remoteViewControllerInterface`.
+MailCompositionService is an application that hosts the content for `MFMailComposeViewController`. I copied this app to my computer for disassembly. It's a small binary and decompilation took a few seconds. Apparently, a class-dump would've been enough though. While looking at the methods, I immediately noticed `+_exportedInterface` and `+_remoteViewControllerInterface`.
 
 ![Ghidra Screenshot](images/ghidra.png)
 
@@ -169,7 +169,7 @@ After recompiling and installing the service, it finally worked! The remote view
 
 ## One more thing - Calling methods on the remote view controller
 
-While looking at the headers, I found one more thing. You can add a method that exists on the service method to the server protocol. After doing so, you can call that method like this:
+While looking at the headers, I found one more thing. It seems like `_UIRemoteViewController` has a method named `-serviceViewControllerProxy`. You can use this object to call methods on the remote object.
 ```objc
 @protocol SERVRootViewControllerRemoteService
 -(instancetype)init;
@@ -183,4 +183,4 @@ While looking at the headers, I found one more thing. You can add a method that 
 
 The return value of the methods you call using this proxy must return either `void` or `NSProgress *`. Any other type will cause an exception to be raised.
 
-**Warning:** This only works on iOS 7.0 and higher. More research needs to be done for iOS 6, as it seems to rely on other things for communication between processes.
+**Warning:** This only works on iOS 7.0 and higher. iOS 6 seems to rely on other things for communication between processes and it doesn't have this method.
