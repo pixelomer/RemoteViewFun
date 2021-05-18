@@ -16,11 +16,11 @@ This is an article about how I made my own UIView service **on iOS 13.4.1**. By 
 
 Recently, I decided to use remote view controllers in my iOS tweak. I knew about these view controllers thanks to [an article by Ole Begemann](https://oleb.net/blog/2012/10/remote-view-controllers-in-ios-6/). You should read it too if you haven't read it.
 
-At first, I thought making my own UIView service would've been an easy task. These view controllers have existed since iOS 6, so there has to be some examples and articles online, right? Nope. That article I linked is apparently the only public article about remote view controllers. So, I decided to research them further.
+At first, I assumed making my own UIView service would've been an easy task. These view controllers have existed since iOS 6, so there has to be some examples and articles online, right? Nope. That article I linked is apparently the only public article about remote view controllers. So, I decided to research them further.
 
 ## Looking at different UIView services
 
-I decided to start by looking at different UIView services located inside of `/Applications`. Specifically, I looked at `MusicUIService.app`, `PassbookUIService.app` and `MailCompositionService.app`. Here's what they have in common.
+I started by looking at different UIView services located inside of `/Applications`. Specifically, I looked at `MusicUIService.app`, `PassbookUIService.app` and `MailCompositionService.app`. These are all built-in remote view services that come with iOS and they have multiple things in common as expected.
 
 **Shared Info.plist values**  
 ```xml
@@ -36,56 +36,18 @@ I decided to start by looking at different UIView services located inside of `/A
 <array>
   <string>com.apple.uikit.viewservice.[bundle identifier]</string>
 </array>
-<key>CAProcessCanAccessGPU</key> <!-- This could be unrelated but I'm not sure -->
-<true/>
 ```
 
 **Shared entitlements**  
 ```xml
-<!-- Common entitlements -->
-<key>com.apple.private.security.container-required</key>
-<true/>
-<key>platform-application</key>
-<true/>
-
-<!-- Important entitlement -->
 <key>com.apple.UIKit.vends-view-services</key>
 <true/>
 ```
 
 ## First attempt
 
-With the information I had, I decided to try creating a new UIView service. I quickly created a new Theos projects with two applications. One for testing the service and one for the service itself.
+With the help of Ole Begemann's article from 2012, I could now try making my own remote view service. I started by creating two Theos projects: one for the view service and one for the client. The view service didn't have anything special, it just had a view controller named `SERVRootViewController` and the necessary Info.plist values and entitlements shown above. As for the client, it used the `_UIRemoteViewController` class to create a new remote view controller.
 
-```
-* project
-|-* testapp
-| |-* Resources
-| | '-* Info.plist
-| |-* Makefile
-| |-* entitlements.xml
-| |-* main.m
-| |-* TESTAppDelegate.h
-| |-* TESTAppDelegate.m
-| |-* TESTRootViewController.h
-| '-* TESTRootViewController.m
-|-* testservice
-| |-* Resources
-| | '-* Info.plist
-| |-* Makefile
-| |-* entitlements.xml
-| |-* main.m
-| |-* SERVAppDelegate.h
-| |-* SERVAppDelegate.m
-| |-* SERVRootViewController.h
-| '-* SERVRootViewController.m
-|-* layout/DEBIAN
-| '-* postinst
-|-* Makefile
-'-* Headers.h
-```
-
-`TESTRootViewController.m` attempts to connect to the service with the following lines:  
 ```objc
 [_UIRemoteViewController
   requestViewController:@"SERVRootViewController"
@@ -108,36 +70,14 @@ With the information I had, I decided to try creating a new UIView service. I qu
 ];
 ```
 
-Unfortunately, this does not work. Instead of a view controller, we get an error.  
+Unfortunately, this did not work. I got the following error instead of a remote view controller.
 ```
 _UIViewServiceInterfaceErrorDomain (error code 0)
 Un-trusted clients may not open applications in the background.
 ```
+This probably meant that I was missing an entitlement or Info.plist value that made my client "trusted". However, instead of finding that magic value, I decided to use the SpringBoard as a client rather than my own app. I created a SpringBoard tweak which runs the same code.
 
-I'm still not sure why I get an error like that. To continue this experiment, instead of a test app, I decided to make a tweak that hooks SpringBoard. So the project now looks like this:  
-```
-* project
-|-* testtweak
-| |-* Makefile
-| |-* testtweak.plist
-| |-* Tweak.x
-|-* testservice
-| |-* Resources
-| | '-* Info.plist
-| |-* Makefile
-| |-* entitlements.xml
-| |-* main.m
-| |-* SERVAppDelegate.h
-| |-* SERVAppDelegate.m
-| |-* SERVRootViewController.h
-| '-* SERVRootViewController.m
-|-* layout/DEBIAN
-| '-* postinst
-|-* Makefile
-'-* Headers.h
-```
-
-This time, our service is launched. However, we still cannot connect to it. Instead, we get an error.
+After installing the tweak and reloading SpringBoard, the service application was actually launched! However, I still couldn't get a remote view controller.
 ```
 _UIViewServiceInterfaceErrorDomain (error code 2)
 Attempt to aquire assertions for com.pixelomer.testservice failed
@@ -145,7 +85,7 @@ Attempt to aquire assertions for com.pixelomer.testservice failed
 
 ## A dive into the headers
 
-When I first saw the error seen above, I was stuck for a while. After trying a few other things, I decided to go back to the headers, specifically [\_UIRemoteViewController.h](https://developer.limneos.net/?ios=13.1.3&framework=UIKitCore.framework&header=_UIRemoteViewController.h). In our case, instance methods are irrelevant since we aren't getting an instance anyway. So, I focused on class methods.  
+When I first saw the error seen above, I was stuck for a while. After desperately trying different things, I decided to go back to the headers, specifically [\_UIRemoteViewController.h](https://developer.limneos.net/?ios=13.1.3&framework=UIKitCore.framework&header=_UIRemoteViewController.h). In this case, instance methods were irrelevant since I didn't have an instance to begin with.
 ```objc
 +(id)exportedInterface;
 +(BOOL)_shouldSendLegacyMethodsFromViewWillTransitionToSize;
@@ -161,9 +101,9 @@ When I first saw the error seen above, I was stuck for a while. After trying a f
 +(id)requestViewControllerWithService:(id)arg1 traitCollection:(id)arg2 connectionHandler:(/*^block*/id)arg3 ;
 ```
 
-From the methods above, only two methods looked interesting: `+exportedInterface` and `+serviceViewControllerInterface`. I decided to call these methods using [FLEX](https://github.com/Flipboard/FLEX). `_UIRemoteViewController` returned null for these methods but when I tried calling them in `MFMailComposeRemoteViewController`, a subclass of `_UIRemoteViewController`, they returned two separate instances of `NSXPCInterface` with two different protocols. Investigating those protocols reveals that the protocol in `+exportedInterface` contains some methods of the client and the protocol in `+serviceViewControllerInterface` contains some methods of the server. You can think of these objects as header files.
+From the methods above, only two methods looked interesting: `+exportedInterface` and `+serviceViewControllerInterface`. I decided to call these methods using [FLEX](https://github.com/Flipboard/FLEX). `_UIRemoteViewController` returned null for these methods but when I tried calling them in `MFMailComposeRemoteViewController` (a subclass of `_UIRemoteViewController`) they returned two separate instances of `NSXPCInterface` with two different protocols. Investigating those protocols reveals that the protocol in `+exportedInterface` contains some methods of the client and the protocol in `+serviceViewControllerInterface` contains some methods of the server. These objects seemed like "header" objects.
 
-I decided to implement these methods myself, so I subclassed `_UIRemoteViewController` like this:  
+With this new information, I subclassed `_UIRemoteViewController` to override these methods.
 ```objc
 // NSXPCInterface is public API, yet the headers don't have it...
 @interface NSXPCInterface : NSObject
@@ -205,15 +145,16 @@ I decided to implement these methods myself, so I subclassed `_UIRemoteViewContr
 %end
 ```
 
-However, this still did not work. However, this time, I got an error about an interrupted connection instead of a client error. So, I decided to take a look at one of the built-in services.
+This still didn't work. However, this time I got a different error about an interrupted connection. Progress?
 
 ## Checking out MailCompositionService
 
-MailCompositionService is an application that hosts the content for `MFMailComposeViewController`. I decided to copy that app from my phone to my computer for disassembly. It's a small binary, and decompilation took a few seconds. Apparently, a class-dump would've been enough though. While looking at the methods, I immediately noticed `+_exportedInterface` and `+_remoteViewControllerInterface`.
+MailCompositionService is an application that hosts the content for `MFMailComposeViewController`. I copied that app from my phone to my computer for disassembly. It's a small binary, and decompilation took a few seconds. Apparently, a class-dump would've been enough though. While looking at the methods, I immediately noticed `+_exportedInterface` and `+_remoteViewControllerInterface`.
 
 ![Ghidra Screenshot](images/ghidra.png)
 
-When I saw this, I decided to add the following into the implementation of SERVRootViewController (class in the service).  
+These methods seemed very similar to the methods on the client. I implemented these methods in `SERVRootViewController`.
+
 ```objc
 + (NSXPCInterface *)_exportedInterface {
 	return [NSXPCInterface interfaceWithProtocol:@protocol(SERVRootViewControllerRemoteService)];
@@ -224,11 +165,11 @@ When I saw this, I decided to add the following into the implementation of SERVR
 }
 ```
 
-Recompiled and installed it and surprisingly it works! I can now see the view controller from the service process inside of SpringBoard!
+After recompiling and installing the service, it finally worked! The remote view controller was being shown in SpringBoard.
 
 ## One more thing - Calling methods on the remote view controller
 
-While looking at the headers, I found one more thing. You can add a method that exists on the service method to the server protocol. After doing so, you can call that method like this:  
+While looking at the headers, I found one more thing. You can add a method that exists on the service method to the server protocol. After doing so, you can call that method like this:
 ```objc
 @protocol SERVRootViewControllerRemoteService
 -(instancetype)init;
